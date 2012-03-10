@@ -18,25 +18,57 @@ class Strand
   def self.current
     @@strands[Fiber.current]
   end
+  
+  # Yield the strand, but have EM resume it on the next tick.
+  def self.pass
+    self.safe_yield do |resumeable|
+        EM.next_tick { resumeable.call }
+    end
+  end
 
   # EM/fiber safe sleep.
   def self.sleep(seconds)
-    fiber = Fiber.current
-    EM::Timer.new(seconds){ fiber.resume }
-    Fiber.yield
+    self.safe_yield do |resumeable|
+        EM::Timer.new(seconds) { resumeable.call }
+    end
   end
-
-  # Alias for Fiber.yield.
+  
+  # Equivalent to Fiber#yield 
   def self.yield(*args)
-    Fiber.yield(*args)
+      head,tail =  Strand.current[:__strand_yield_queue__] ||= [ [], [] ]
+      tail = head.push(*tail)
+      Strand.current[:__strand_yield_queue__] = [ tail, [] ]
+      if tail.size > 0 then tail.shift else Fiber.yield(*args) end
   end
 
-  # Yield the strand, but have EM resume it on the next tick.
-  def self.pass
-    fiber = Fiber.current
-    EM.next_tick{ fiber.resume }
-    Fiber.yield
+
+  # Execute a block that calls resume in a later eventmachine tick
+  # and then wait for that resume. Used by Strand#pass and Strand#sleep 
+  #   Strand.safe_yield do |resumable|
+  #     EM.timer(some_delay) { do_something() ; resumable.call }
+  #   end
+  def self.safe_yield()
+     fiber, marker = Fiber.current, Object.new()
+     resumable = lambda { fiber.resume(marker) }
+     
+     yield resumable
+
+     resumed = self.yield()
+     
+     until marker.equal?(resumed)
+        resumed = requeue(resumed)
+     end
+
+     resumed
   end
+  
+  def self.requeue(resumed)
+      head, tail = Strand.current[:__strand_yield_queue__]
+      head << resumed
+      if tail.size > 0 then tail.shift else Fiber.yield end
+  end
+
+  private_class_method :requeue
 
   # Create and run a strand.
   def initialize(&block)
@@ -70,7 +102,7 @@ class Strand
 
   # Like Fiber#resume.
   def resume(*args)
-    @fiber.resume(*args)
+      @fiber.resume(*args)
   end
 
   # Like Thread#alive? or Fiber#alive?
