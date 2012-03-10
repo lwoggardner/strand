@@ -5,6 +5,8 @@ require "strand/condition_variable"
 class Strand
 
   @@strands = {}
+  @yield_queues = {}
+  
 
   # The strand's underlying fiber.
   attr_reader :fiber
@@ -35,10 +37,14 @@ class Strand
   
   # Equivalent to Fiber#yield 
   def self.yield(*args)
-      head,tail =  Strand.current[:__strand_yield_queue__] ||= [ [], [] ]
-      tail = head.push(*tail)
-      Strand.current[:__strand_yield_queue__] = [ tail, [] ]
-      if tail.size > 0 then tail.shift else Fiber.yield(*args) end
+      if @yield_queues.has_key?(Fiber.current)
+           head,tail = @yield_queues[Fiber.current]                   
+           tail.unshift(*head); head.clear
+           @yield_queues.delete(Fiber.current) if tail.size <= 1 
+           return tail.shift if tail.size > 0
+      end
+
+      Fiber.yield(*args)
   end
 
 
@@ -61,14 +67,14 @@ class Strand
 
      resumed
   end
-  
+ 
+  # After Strand#yield, if the resumed item isn't the one you expected
+  # then you can requeue it and wait for the next one
   def self.requeue(resumed)
-      head, tail = Strand.current[:__strand_yield_queue__]
+      head, tail = @yield_queues[Fiber.current] ||= [ [], [] ]
       head << resumed
       if tail.size > 0 then tail.shift else Fiber.yield end
   end
-
-  private_class_method :requeue
 
   # Create and run a strand.
   def initialize(&block)

@@ -30,23 +30,32 @@ class Strand
       @waiters << fiber
 
       # Setup the timer if they specified a timeout
-      timer = EM::Timer.new(timeout){ fiber.resume(:timeout) } if timeout
+      timer = EM::Timer.new(timeout) { fiber.resume(self,:timeout) }  if timeout
 
       # Wait for signal or timeout.
-      if Fiber.yield == :timeout
+      resumed = Strand.yield 
+   
+      until resumed.kind_of?(Array) && resumed[0].equal?(self)
+          resumed = Strand.requeue(resumed)
+      end
+
+      case resumed[1]
+      when :timeout
         # Timeout occurred.
 
         # Remove from list of waiters.
         @waiters.delete(fiber)
 
         false
-      else
+      when :signalled 
         # Ok we were signaled.
 
         # Cancel the timer if there is one.
         timer.cancel if timer
 
         true
+      else
+          raise "Unexpected resume #{resumed[1]}"
       end
 
     end
@@ -71,7 +80,7 @@ class Strand
       waiter = @waiters.shift
 
       # Resume it on next tick.
-      EM.next_tick{ waiter.resume }
+      EM.next_tick{ waiter.resume(self,:signalled) }
     end
 
   end

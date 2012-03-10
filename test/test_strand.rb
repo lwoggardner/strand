@@ -61,15 +61,17 @@ class TestStrand < Test::Unit::TestCase
     strand = Strand.new do
       fiber = Fiber.current
       EM.next_tick { fiber.resume(:my_marker)  }
+      EM.next_tick { fiber.resume(:marker_two) }
       # this pass will recieve the above resume rather than its own
       Strand.pass
       # but it should hold on to it for returning to the next yield
       assert_equal Strand.yield, :my_marker
+      assert_equal Strand.yield, :marker_two
     end
 
     assert strand.join
-    puts "joined"
-    
+    queues = Strand.instance_variable_get(:@yield_queues)
+    assert_equal 0,queues.size
   end
 
   test "out of order resume in same EM event" do
@@ -77,9 +79,14 @@ class TestStrand < Test::Unit::TestCase
     strand = Strand.new do
       fiber = Fiber.current
       Strand.pass
-      assert_equal Strand.yield, :yield_marker
+      assert_equal :yield_marker, Strand.yield
     end
     fiber.resume(:yield_marker)
+    strand.join
+    queues = Strand.instance_variable_get(:@yield_queues)
+    puts queues.inspect
+    assert_equal 0,queues.size
+
   end
 
   test "strand_list" do
