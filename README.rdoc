@@ -1,8 +1,6 @@
 = strand
 
-Strand is a class that wraps Fibers and gives them Thread-like behavior by using EventMachine.
-
-Strand::ConditionVariable provides functionality for Fibers similar to Ruby's built in ConditionVariable for Threads.
+Strand is a module that provides Thread-like behavior for Fibers in EventMachine.
 
 == Like Threads
 
@@ -168,6 +166,5 @@ The output is:
 
 == Copyright
 
-Copyright (c) 2011 Christopher J. Bottaro. See LICENSE.txt for
-further details.
+Copyright (c) 2011 Christopher J. Bottaro. See LICENSE.txt for further details.
 

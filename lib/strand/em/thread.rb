@@ -7,7 +7,7 @@ module Strand
 
     module EM
 
-        #Acts like a thread using Fibers and EventMachine
+        #Acts like a ::Thread using Fibers and EventMachine
         class Thread
 
             @@strands = {}
@@ -15,37 +15,41 @@ module Strand
             # The underlying fiber.
             attr_reader :fiber
 
-            # Return an array of all EM::Threads that are alive.
-            # TODO - check for alive? because a ProxyThread might be dead
+            # Like ::Thread::list. Return an array of all EM::Threads that are alive.
             def self.list
-                @@strands.values
+                @@strands.values.select { |s| s.alive? }
             end
 
-            # Get the currently running EM::Thread, eg to access thread local
+            # Like ::Thread::current. Get the currently running EM::Thread, eg to access thread local
             # variables
             def self.current
                 @@strands[Fiber.current] || ProxyThread.new(Fiber.current)
             end
 
-            # Alias for Fiber.yield
+            # Alias for Fiber::yield
             # Equivalent to a thread being blocked on IO
+            #
+            # WARNING: Be very careful about using #yield with the other thread like methods
+            # Specifically it is important
+            # to ensure user calls to #resume don't conflict with the resumes that are setup via
+            # EM.timer or EM.next_tick as a result of #::sleep or #::pass
             def self.yield(*args)
                 Fiber.yield(*args)
             end
 
-            # EM/fiber safe sleep.
+            # Like ::Kernel::sleep. Woken by an ::EM::Timer in +seconds+ if supplied
             def self.sleep(seconds=nil)
                 strand = current
                 timer = ::EM::Timer.new(seconds){ strand.__send__(:wake_resume) } if seconds
                 strand.__send__(:yield_sleep,timer)
             end
 
-            # Sleep forever (until woken)
+            # Like ::Thread::stop. Sleep forever (until woken)
             def self.stop
                 self.sleep()
             end
 
-            # EM/fiber safe pass
+            # Like ::Thread::pass.
             # The fiber is resumed on the next_tick of EM's event loop
             def self.pass
                 strand = current
@@ -65,7 +69,7 @@ module Strand
                 fiber.resume(*args)
             end
 
-            # Like Thread#join.
+            # Like ::Thread#join.
             #   s1 = Strand.new{ Strand.sleep(1) }
             #   s2 = Strand.new{ Strand.sleep(1) }
             #   s1.join
@@ -76,24 +80,24 @@ module Strand
                 if alive? then nil else self end
             end
 
-            # Like Fiber#resume.
+            # Like Fiber#resume. Refer to warnings on #::yield
             def resume(*args)
                 #TODO  should only allow if @status is :run, which really means
                 # blocked by a call to Yield
                 fiber.resume(*args)
             end
 
-            # Like Thread#alive? or Fiber#alive?
+            # Like ::Thread#alive? or Fiber#alive?
             def alive?
                 fiber.alive?
             end
 
-            # Is this Thread stopped? (always unless our fiber is the current fiber)
+            # Like ::Thread#stop? Always true unless our fiber is the current fiber
             def stop?
                 Fiber.current != fiber
             end
 
-            # Like Thread#status
+            # Like ::Thread#status
             def status
                 case @status
                 when :run
@@ -112,14 +116,14 @@ module Strand
                 end
             end
 
-            # Like Thread#value.  Implicitly calls #join.
+            # Like ::Thread#value.  Implicitly calls #join.
             #   strand = Strand.new{ 1+2 }
             #   strand.value # => 3
             def value
                 join and @value
             end
 
-            #
+            # Like ::Thread#exit. Signals thread to wakeup and die
             def exit
                 case @status
                 when :sleep
@@ -132,11 +136,13 @@ module Strand
             alias :kill :exit
             alias :terminate :exit
 
+            # Like ::Thread#wakeup Wakes a sleeping Thread
             def wakeup
                 Kernel.raise FiberError, "dead strand" unless status
                 wake_resume() 
             end
 
+            # Like ::Thread#raise, raise an exception on a sleeping Thread
             def raise(*args)
                 if fiber == Fiber.current
                     Kernel.raise *args 
@@ -151,7 +157,7 @@ module Strand
             alias :run :wakeup
 
 
-            # Access to "strand local" variables, akin to "thread local" variables.
+            # Access to "fiber local" variables, akin to "thread local" variables.
             #   Strand.new do
             #     ...
             #     Strand.current[:connection].send(data)
@@ -161,7 +167,7 @@ module Strand
                 @locals[name.to_sym]
             end
 
-            # Access to "strand local" variables, akin to "thread local" variables.
+            # Access to "fiber local" variables, akin to "thread local" variables.
             #   Strand.new do
             #     ...
             #     Strand.current[:connection] = SomeConnectionClass.new(host, port)
@@ -171,20 +177,21 @@ module Strand
                 @locals[name.to_sym] = value
             end
 
-            # Is there a "strand local" variable defined called +name+
+            # Like ::Thread#key? Is there a "fiber local" variable defined called +name+
             def key?(name)
                 @locals.has_key?(name.to_sym)
             end
 
-            # The set of "strand local" variable keys
+            # Like ::Thread#keys The set of "strand local" variable keys
             def keys()
                 @locals.keys
             end
 
             def inspect #:nodoc:
-                "#<Strand:0x%s %s" % [object_id, @fiber == Fiber.current ? "run" : "yielded"]
+                "#<Strand::EM::Thread:0x%s %s" % [object_id, @fiber == Fiber.current ? "run" : "yielded"]
             end
 
+            # Do something when the fiber completes.
             def ensure_hook(key,&block)
                 if block_given? then 
                     @ensure_hooks[key] = block
@@ -222,6 +229,7 @@ module Strand
 
                 @value || @exception
             end
+
             private
 
             def init(fiber)
@@ -272,12 +280,13 @@ module Strand
             end
         end
 
-        #TODO If strand methods are called on Fibers that were not created
+        # This class is used if EM::Thread class methods are called on Fibers that were not created
         # with EM::Thread.new()
-        # create a special EM:Thread instance with a cleanup job that detects
-        # fiber death. 
-        # those kind of Threads would not be able to be killed. 
         class ProxyThread < Thread
+           
+            #TODO start an EM periodic timer to reap dead proxythreads (running ensurehooks)
+            #TODO do something sensible for #value, #kill
+
             def initialize(fiber)
                 init(fiber)
             end

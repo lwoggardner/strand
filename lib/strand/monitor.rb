@@ -1,15 +1,11 @@
-# This file is derived from MRI Ruby 1.9.3 monitor.rb
-#
-# Copyright (C) 2001  Shugo Maeda <shugo@ruby-lang.org>
-#
-# This library is distributed under the terms of the Ruby license.
-# You can freely distribute/modify this library.
-#
-
 
 module Strand
 
     # See MRI Ruby's MonitorMixin
+    # This file (strand/monitor.rb) is derived from MRI Ruby 1.9.3 monitor.rb
+    #
+    # Copyright (C) 2001  Shugo Maeda <shugo@ruby-lang.org>
+    #
     module MonitorMixin
         
         class ConditionVariable
