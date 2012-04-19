@@ -56,37 +56,29 @@ class TestStrand < Test::Unit::TestCase
     assert_equal %w[1a 2a 1b 2b 1c 2c], results
   end
 
-  test "out of order resume in later EM event" do
+  test "improper_yield" do
     test_fiber = Fiber.current
     strand = Strand.new do
       fiber = Fiber.current
-      EM.next_tick { fiber.resume(:my_marker)  }
-      EM.next_tick { fiber.resume(:marker_two) }
-      # this pass will recieve the above resume rather than its own
+      EM::Timer.new(0.01) do
+        assert_raise(FiberError){ fiber.resume }
+        test_fiber.resume
+      end
       Strand.pass
-      # but it should hold on to it for returning to the next yield
-      assert_equal Strand.yield, :my_marker
-      assert_equal Strand.yield, :marker_two
     end
 
     assert strand.join
-    queues = Strand.instance_variable_get(:@yield_queues)
-    assert_equal 0,queues.size
+    Fiber.yield
   end
 
-  test "out of order resume in same EM event" do
+  test "improper_pass" do
     fiber = nil
     strand = Strand.new do
       fiber = Fiber.current
       Strand.pass
-      assert_equal :yield_marker, Strand.yield
+      Strand.yield
     end
-    fiber.resume(:yield_marker)
-    strand.join
-    queues = Strand.instance_variable_get(:@yield_queues)
-    puts queues.inspect
-    assert_equal 0,queues.size
-
+    fiber.resume
   end
 
   test "strand_list" do
