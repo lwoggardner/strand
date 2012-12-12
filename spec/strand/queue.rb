@@ -1,20 +1,11 @@
-require 'spec_helper'
+shared_examples_for "a queue" do
 
-# These specs are derived from rubyspec for ruby's standard Queue class
-describe Strand::Queue do
-    include EM::SpecHelper
-
-    around(:each) do |example|
-        em do
-            example.run
-            done
-        end
-    end
+    # These specs are derived from rubyspec for ruby's standard Queue class
 
     context :enqueue do
 
         it "adds an element to the Queue" do
-            q = described_class.new
+            q = Strand::Queue.new
             q.size.should == 0
             q << Object.new
             q.size.should == 1
@@ -28,7 +19,7 @@ describe Strand::Queue do
 
     context :dequeue do
         it "removes an item from the Queue" do
-            q = described_class.new
+            q = Strand::Queue.new
             q << Object.new
             q.size.should == 1
             q.pop
@@ -36,38 +27,37 @@ describe Strand::Queue do
         end
 
         it "returns items in the order they were added" do
-            q = described_class.new
+            q = Strand::Queue.new
             q << 1
             q << 2
             q.deq.should == 1
             q.shift.should == 2
         end
 
-        it "blocks the Fiber until there are items in the queue" do
-            q = described_class.new
+        it "blocks until there are items in the queue" do
+            q = Strand::Queue.new
             v = 0
 
-            f = Fiber.new do
+            s = Strand.new do
                 q.pop
                 v = 1
             end
-            f.resume
 
             v.should == 0
             q << Object.new
-            Strand.pass while f.alive?
+            s.join()
             v.should == 1
         end
 
-        it "raises a FiberError if Queue is empty" do
-            q = described_class.new
-            lambda { q.pop(true) }.should raise_error(FiberError)
+        it "raises a StrandError if Queue is empty" do
+            q = Strand::Queue.new
+            lambda { q.pop(true) }.should raise_error(strand_exception)
         end
     end
 
     context :length do
         it "returns the number of elements" do
-            q = described_class.new
+            q = Strand::Queue.new
             q.length.should == 0
             q << Object.new
             q << Object.new
@@ -77,26 +67,26 @@ describe Strand::Queue do
 
     context :empty do
         it "returns true on an empty Queue" do
-            q = described_class.new
+            q = Strand::Queue.new
             q.empty?.should be_true
         end
 
         it "returns false when Queue is not empty" do
-            q = described_class.new
+            q = Strand::Queue.new
             q << Object.new
             q.empty?.should be_false
         end
     end
 
     context :num_waiting do
-        it "reports the number of Fibers waiting on the Queue" do
-            q = described_class.new
+        it "reports the number of Strands waiting on the Queue" do
+            q = Strand::Queue.new
             fibers = []
 
             5.times do |i|
                 q.num_waiting.should == i
-                f = Fiber.new { q.deq }
-                f.resume
+                f = Strand.new { q.deq }
+                Strand.pass until f.status and f.status == 'sleep'
                 fibers << f
             end
 

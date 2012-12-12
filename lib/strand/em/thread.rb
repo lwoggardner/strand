@@ -39,9 +39,15 @@ module Strand
 
             # Like ::Kernel::sleep. Woken by an ::EM::Timer in +seconds+ if supplied
             def self.sleep(seconds=nil)
+
+                raise TypeError, "seconds #{seconds} must be a number" unless seconds.nil? or seconds.is_a? Numeric
+                n = Time.now
+
                 strand = current
-                timer = ::EM::Timer.new(seconds){ strand.__send__(:wake_resume) } if seconds
+                timer = ::EM::Timer.new(seconds){ strand.__send__(:wake_resume) } unless seconds.nil?
                 strand.__send__(:yield_sleep,timer)
+
+                (Time.now - n).round()
             end
 
             # Like ::Thread::stop. Sleep forever (until woken)
@@ -55,6 +61,7 @@ module Strand
                 strand = current
                 ::EM.next_tick{ strand.__send__(:wake_resume) }
                 strand.__send__(:yield_sleep)
+                nil
             end
 
             # Create and run 
@@ -164,6 +171,7 @@ module Strand
             #     ...
             #   end
             def [](name)
+                raise TypeError, "name #{name} must convert to_sym" unless name and name.respond_to?(:to_sym)
                 @locals[name.to_sym]
             end
 
@@ -174,11 +182,13 @@ module Strand
             #     ...
             #   end
             def []=(name, value)
+                raise TypeError, "name #{name} must convert to_sym" unless name and name.respond_to?(:to_sym)
                 @locals[name.to_sym] = value
             end
 
             # Like ::Thread#key? Is there a "fiber local" variable defined called +name+
             def key?(name)
+                raise TypeError, "name #{name} must convert to_sym" unless name and name.respond_to?(:to_sym)
                 @locals.has_key?(name.to_sym)
             end
 

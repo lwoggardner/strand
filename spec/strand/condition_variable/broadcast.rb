@@ -16,6 +16,8 @@ shared_examples_for "ConditionVariable#broadcast" do
                 end
             end
 
+            Strand.pass while th.status and th.status != 'sleep'
+
             m.synchronize { cv.broadcast }.should == cv
 
             th.join

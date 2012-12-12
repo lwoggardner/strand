@@ -4,6 +4,7 @@ shared_examples_for "Strand#stop" do
     context :stop  do
         it "causes the current strand to sleep indefinitely" do
             t = Strand.new { Strand.stop; 5 }
+            Strand.pass while t.status and t.status != 'sleep'
             t.status.should == 'sleep'
             t.run
             t.value.should == 5
@@ -15,10 +16,10 @@ shared_examples_for "Strand#stop" do
             StrandSpecs.status_of_current_strand.stop?.should == false
         end
         quarantine! do
-          #Can't really have a running strand
-        it "describes a running strand" do
-            StrandSpecs.status_of_running_strand.stop?.should == false
-        end
+            #Can't really have a running strand
+            it "describes a running strand" do
+                StrandSpecs.status_of_running_strand.stop?.should == false
+            end
         end
         it "describes a sleeping strand" do
             StrandSpecs.status_of_sleeping_strand.stop?.should == true

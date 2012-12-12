@@ -1,3 +1,4 @@
+require 'strand/version'
 require 'thread'
 require 'fiber'
 
@@ -22,7 +23,24 @@ require 'fiber'
 #           # which wraps a ::Fiber
 #      end
 #   end
-#   
+#
+#   # Outside of event machine 
+#   t = Strand.new() do
+#       # "t" is a raw ::Thread
+#   end
+#
+# Code using Strand that may be used in both Fiber or Thread contexts
+# should take care to rescue both {FiberError} and {ThreadError} in any
+# exception handling code
+#
+# {::Thread} methods not implemented by Strand
+#   * .main - although there is a root fiber it is not really equivalent to {::Thread.main}
+#   * .start - not implemented
+#   * #exclusive - not implemented  
+#   * #critical - not implemented
+#   * #set_trace_func - not implemented
+#   * #safe_level - not implemented
+#   * #priority - not implemented
 module Strand
 
     # Test whether we have real fibers or a thread based fiber implmentation
@@ -85,7 +103,10 @@ module Strand
     end
 
     # ::Kernel::sleep or EM::Thread::sleep
+    # Note that passing nil will sleep forever (where Kernel.sleep raises TypeError)
     def self.sleep(*args)
+        # Kernel.sleep treats nil as an error, but we use it to indicate sleeping forever
+        args.shift if args.length == 1 and args.first.nil?    
         delegate_class(::Kernel).sleep(*args)
     end
 
@@ -99,6 +120,8 @@ module Strand
         delegate_class(::Thread).pass()
     end
 
+    #TODO Is there some equivalence between the root Fiber and Thread.main?
+    
     # Convenience to call Fiber.yield. Note the warning on EM::Thread::yield
     def self.yield(*args)
         Fiber.yield(*args)

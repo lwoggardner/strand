@@ -15,3 +15,7 @@ require "strand/atc"
 Atc = Strand::Atc
 
 require "em-spec/rspec"
+
+def quarantine!(&specs)
+    #Nothing
+end

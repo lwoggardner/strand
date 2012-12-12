@@ -27,30 +27,34 @@ shared_examples_for "Strand#exit"  do
             ScratchPad.recorded.should == :in_ensure_clause
         end
 
-        it "runs nested ensure clauses" do
-            ScratchPad.record []
-            outer = Strand.new do
-                begin
-                    inner = Strand.new do
-                        begin
-                            Strand.sleep
-                        ensure
-                            ScratchPad << :inner_ensure_clause
+        quarantine! do
+            # >1.9.2 has this as undefined
+            it "runs nested ensure clauses" do
+                ScratchPad.record []
+                outer = Strand.new do
+                    begin
+                        inner = Strand.new do
+                            begin
+                                Strand.sleep
+                            ensure
+                                ScratchPad << :inner_ensure_clause
+                            end
                         end
+                        Strand.sleep
+                    ensure
+                        ScratchPad << :outer_ensure_clause
+                        Strand.pass while inner.status and inner.status != "sleep"
+                        # exit is private for thread, but not for em::thread
+                        inner.terminate
+                        inner.join
                     end
-                    Strand.sleep
-                ensure
-                    ScratchPad << :outer_ensure_clause
-                    inner.exit
-                    inner.join
                 end
+                outer.terminate
+                outer.join
+                ScratchPad.recorded.should include(:inner_ensure_clause)
+                ScratchPad.recorded.should include(:outer_ensure_clause)
             end
-            outer.terminate
-            outer.join
-            ScratchPad.recorded.should include(:inner_ensure_clause)
-            ScratchPad.recorded.should include(:outer_ensure_clause)
         end
-
         it "does not set $!" do
             strand = StrandSpecs.dying_strand_ensures(:kill) { ScratchPad.record $! }
             strand.join

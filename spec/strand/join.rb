@@ -13,8 +13,8 @@ shared_examples_for "Strand#join" do
         end
 
         it "returns nil if it is not finished when given a timeout" do
-            c = Channel.new
-            t = Strand.new { c.receive }
+            c = Strand::Queue.new
+            t = Strand.new { c.shift }
             begin
                 t.join(0).should == nil
             ensure
@@ -24,8 +24,8 @@ shared_examples_for "Strand#join" do
         end
 
         it "accepts a floating point timeout length" do
-            c = Channel.new
-            t = Strand.new { c.receive }
+            c = Strand::Queue.new
+            t = Strand.new { c.shift }
             begin
                 t.join(0.01).should == nil
             ensure

@@ -1,26 +1,17 @@
-require 'spec_helper'
 
 # This spec derived from rubyspec for mutex
-describe Strand::Mutex do
-    include EM::SpecHelper
-
-    around(:each) do |example|
-        em do 
-            example.run
-            done
-        end
-    end
+shared_examples "a mutex" do
 
     context :lock  do
 
         it "returns self" do
-            m = described_class.new
+            m = Strand::Mutex.new
             m.lock.should == m
             m.unlock
         end
 
         it "waits if the lock is not available" do
-            m = described_class.new
+            m = Strand::Mutex.new
 
             status = nil
             m.lock
@@ -81,12 +72,12 @@ describe Strand::Mutex do
     end
 
     context :unlock do
-        it "raises FiberError unless Mutex is locked" do
-            mutex = described_class.new
-            lambda { mutex.unlock }.should raise_error(FiberError)
+        it "raises StrandError unless Mutex is locked" do
+            mutex = Strand::Mutex.new
+            lambda { mutex.unlock }.should raise_error(strand_exception)
         end
 
-        it "raises FiberError unless thread owns Mutex" do
+        it "raises StrandError unless thread owns Mutex" do
             mutex = Strand::Mutex.new
             wait = Strand::Mutex.new
             wait.lock
@@ -96,13 +87,13 @@ describe Strand::Mutex do
                 wait.lock
             end
 
-            lambda { mutex.unlock }.should raise_error(FiberError)
+            lambda { mutex.unlock }.should raise_error(strand_exception)
 
             wait.unlock
             s.join
         end
 
-        it "raises FiberError if previously locking thread is gone" do
+        it "raises StrandError if previously locking thread is gone" do
             mutex = Strand::Mutex.new
             s = Strand.new do
                 mutex.lock
@@ -111,7 +102,7 @@ describe Strand::Mutex do
             s.join
             #TODO This doesn't make sense, because it would raise error
             # as per above test
-            lambda { mutex.unlock }.should raise_error(FiberError)
+            lambda { mutex.unlock }.should raise_error(strand_exception)
         end
     end
 
@@ -138,7 +129,7 @@ describe Strand::Mutex do
                 m1.lock
                 m2.lock
             end
-
+            Strand.pass while s.status and s.status != "sleep"
             m1.locked?.should be_true
             m2.unlock # release s
             s.join
@@ -154,7 +145,7 @@ describe Strand::Mutex do
             m.try_lock
 
             m.locked?.should be_true
-            lambda { m.try_lock.should be_false }.should_not raise_error(FiberError)
+            lambda { m.try_lock.should be_false }.should_not raise_error(strand_exception)
         end
 
         it "returns false if lock can not be aquired immediately" do
@@ -166,7 +157,7 @@ describe Strand::Mutex do
                 m1.lock
                 m2.lock
             end
-
+            Strand.pass while s.status and s.status != "sleep"
             # s owns m1 so try_lock should return false
             m1.try_lock.should be_false
             m2.unlock
@@ -190,6 +181,7 @@ describe Strand::Mutex do
                 end.should raise_error(Exception)
             end
 
+            Strand.pass while s.status and s.status != "sleep"
             m1.locked?.should be_true
             m2.unlock
             s.join
@@ -198,9 +190,9 @@ describe Strand::Mutex do
     end
 
     context :sleep do
-        it "raises FiberError if not locked by the current thread" do
+        it "raises StrandError if not locked by the current thread" do
             m = Strand::Mutex.new
-            lambda { m.sleep }.should raise_error(FiberError)
+            lambda { m.sleep }.should raise_error(strand_exception)
         end
 
         it "pauses execution for approximately the duration requested" do
@@ -215,8 +207,8 @@ describe Strand::Mutex do
         it "unlocks the mutex while sleeping" do
             m = Strand::Mutex.new
             s = Strand.new { m.lock; m.sleep }
+            Strand.pass while s.status and s.status != "sleep"
             m.locked?.should be_false
-            # Fails due to no Strand#run
             s.run
             s.join
         end
@@ -238,6 +230,7 @@ describe Strand::Mutex do
                     m.locked?
                 end
             end
+            Strand.pass while s.status and s.status != "sleep"
             s.raise(Exception)
             s.value.should be_true
         end

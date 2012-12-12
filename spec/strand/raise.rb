@@ -8,7 +8,7 @@ shared_examples_for "Strand#raise" do
         end
     end
 
-    context "Strand#raise on a sleeping strand" do
+    context "raise on a sleeping strand" do
         before :each do
             ScratchPad.clear
             @str = StrandSpecs.sleeping_strand

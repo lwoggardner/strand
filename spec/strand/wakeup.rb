@@ -7,11 +7,13 @@ shared_examples_for "Strand#wakeup" do
             after_sleep2 = false
 
             t = Strand.new do
-                while true
-                    #Unlike a thread, we need to pass
-                    Strand.pass
-                    break if exit_loop == true
-                end
+
+                # For Threads, this is an infinite running loop
+                # but for EM::Thread this part of the test cannot
+                # be simulated
+                #while true
+                #    break if exit_loop == true
+                #end unless 
 
                 Strand.sleep
                 after_sleep1 = true
@@ -19,12 +21,12 @@ shared_examples_for "Strand#wakeup" do
                 Strand.sleep
                 after_sleep2 = true
             end
-
-            exit_loop = true
-
+          
+            10.times { Strand.sleep(0.1) if t.status and t.status != "sleep" } 
             after_sleep1.should == false # t should be blocked on the first sleep
             t.send(:wakeup)
 
+            10.times { Strand.sleep(0.1) if t.status and t.status != "sleep" } 
             after_sleep2.should == false # t should be blocked on the second sleep
             t.send(:wakeup)
 
@@ -39,7 +41,7 @@ shared_examples_for "Strand#wakeup" do
             while(t.status != false) do
                 begin
                     t.send(:wakeup)
-                rescue StrandError
+                rescue FiberError,ThreadError
                     # The strand might die right after.
                     t.status.should == false
                 end
@@ -49,9 +51,10 @@ shared_examples_for "Strand#wakeup" do
         end
 
         it "raises a StrandError when trying to wake up a dead strand" do
+            expected_error = Strand.event_machine? ? FiberError : ThreadError
             t = Strand.new { 1 }
             t.join
-            lambda { t.wakeup }.should raise_error(FiberError)
+            lambda { t.wakeup }.should raise_error(expected_error)
         end
     end
 end

@@ -41,7 +41,6 @@ module Strand
                 unlock
                 begin
                     Thread.sleep(timeout)
-                    if timeout.nil? then 0 else timeout.round() end
                 ensure
                     lock
                 end

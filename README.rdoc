@@ -2,9 +2,11 @@
 
 Strand is a module that provides Thread-like behavior for Fibers in EventMachine.
 
+http://rubygems.org/gems/strand
+
 == Like Threads
 
-Strand has an interface similar to Thread.
+Strand has an interface identical to Thread wherever possible. The specs for Strand are based on the ruby-spec for Thread
 
   thread = Thread.new{ 1+2 }
   thread.join
@@ -16,15 +18,7 @@ Strand has an interface similar to Thread.
 
 == Fiber/EventMachine aware sleep
 
-Calling sleep usually results in EventMachine's reactor being blocked, but Strand defines an EM+Fiber safe sleep.
-
-Consider mimicking the following threaded code:
-
-  t1 = Thread.new{ sleep(1) }
-  t2 = Thread.new{ sleep(1) }
-  t1.join
-  t2.join
-  # Roughly 1 second will have passed.
+Calling ruby's Kernel.sleep will block the EventMachine reactor, but Strand defines an EM+Fiber safe sleep.
 
 Assuming that EventMachine is running:
 
@@ -32,7 +26,10 @@ Assuming that EventMachine is running:
   s2 = Strand.new{ Strand.sleep(1) }
   s1.join
   s2.join
+
   # Roughly 1 second will have passed.
+
+When run outside of the EventMachine reactor, Strand delegates to ruby's native ::Thread so the above code would still work as expected.
 
 == Thread local, Fiber local and Strand local variables
 
@@ -150,10 +147,6 @@ The output is:
   3
   3
 
-== RDoc
-
-{\http://doc.stochasticbytes.com/strand/index.html}[http://doc.stochasticbytes.com/strand/index.html]
-
 == Contributing to strand
  
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet
@@ -161,10 +154,13 @@ The output is:
 * Fork the project
 * Start a feature/bugfix branch
 * Commit and push until you are happy with your contribution
-* Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
+* Make sure to add specs, preferably based on ruby-spec
 * Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
 
 == Copyright
 
-Copyright (c) 2011 Christopher J. Bottaro. See LICENSE.txt for further details.
+Copyright (c) 2011 Christopher J. Bottaro.
+Copyright (c) 2012 Grant Gardner.
+
+See LICENSE.txt for further details.
 
